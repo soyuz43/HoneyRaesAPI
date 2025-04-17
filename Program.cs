@@ -149,6 +149,7 @@ app.MapPut("/servicetickets/{id}", (int id, ServiceTicket serviceTicket) =>
 
     return Results.NoContent();
 });
+
 // Marking a Ticket as Complete (Custom POST)
 app.MapPost("/servicetickets/{id}/complete", (int id) =>
 {
