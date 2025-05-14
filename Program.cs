@@ -3,7 +3,7 @@ using HoneyRaesAPI.Models.DTOs;
 using Npgsql;
 
 
-var connectionString = "Host=localhost;Port=5432;Username=postgres;Password=YOUR_PASSWORD;Database=HoneyRaes";
+var connectionString = "Host=localhost;Port=5432;Username=postgres;Password=4224;Database=HoneyRaes";
 
 
 List<Customer> customers = new()
@@ -200,26 +200,60 @@ app.MapGet("/employees", () =>
 
 app.MapGet("/employees/{id}", (int id) =>
 {
-    var employee = employees.FirstOrDefault(e => e.Id == id);
-    if (employee is null) return Results.NotFound();
+    EmployeeDTO? employeeDto = null;
 
-    var tickets = serviceTickets.Where(st => st.EmployeeId == id).ToList();
+    using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+    connection.Open();
 
-    return Results.Ok(new EmployeeDTO
+    using NpgsqlCommand command = connection.CreateCommand();
+    command.CommandText = @"
+        SELECT 
+            e.Id,
+            e.Name, 
+            e.Specialty, 
+            st.Id AS serviceTicketId, 
+            st.CustomerId,
+            st.EmployeeId,
+            st.Description,
+            st.Emergency,
+            st.DateCompleted 
+        FROM Employee e
+        LEFT JOIN ServiceTicket st ON st.EmployeeId = e.Id
+        WHERE e.Id = @id";
+    command.Parameters.AddWithValue("@id", id);
+
+    using NpgsqlDataReader reader = command.ExecuteReader();
+
+    while (reader.Read())
     {
-        Id = employee.Id,
-        Name = employee.Name,
-        Specialty = employee.Specialty,
-        ServiceTickets = tickets.Select(t => new ServiceTicketDTO
+        if (employeeDto == null)
         {
-            Id = t.Id,
-            CustomerId = t.CustomerId,
-            EmployeeId = t.EmployeeId,
-            Description = t.Description,
-            Emergency = t.Emergency,
-            DateCompleted = t.DateCompleted
-        }).ToList()
-    });
+            employeeDto = new EmployeeDTO
+            {
+                Id = reader.GetInt32(reader.GetOrdinal("Id")),
+                Name = reader.GetString(reader.GetOrdinal("Name")),
+                Specialty = reader.GetString(reader.GetOrdinal("Specialty")),
+                ServiceTickets = new List<ServiceTicketDTO>()
+            };
+        }
+
+        if (!reader.IsDBNull(reader.GetOrdinal("serviceTicketId")))
+        {
+            employeeDto.ServiceTickets.Add(new ServiceTicketDTO
+            {
+                Id = reader.GetInt32(reader.GetOrdinal("serviceTicketId")),
+                CustomerId = reader.GetInt32(reader.GetOrdinal("CustomerId")),
+                EmployeeId = id,
+                Description = reader.GetString(reader.GetOrdinal("Description")),
+                Emergency = reader.GetBoolean(reader.GetOrdinal("Emergency")),
+                DateCompleted = reader.IsDBNull(reader.GetOrdinal("DateCompleted"))
+                    ? null
+                    : reader.GetDateTime(reader.GetOrdinal("DateCompleted"))
+            });
+        }
+    }
+
+    return employeeDto == null ? Results.NotFound() : Results.Ok(employeeDto);
 });
 
 // Customers Endpoints
