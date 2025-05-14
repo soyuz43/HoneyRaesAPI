@@ -1,5 +1,10 @@
 using HoneyRaesAPI.Models;
 using HoneyRaesAPI.Models.DTOs;
+using Npgsql;
+
+
+var connectionString = "Host=localhost;Port=5432;Username=postgres;Password=YOUR_PASSWORD;Database=HoneyRaes";
+
 
 List<Customer> customers = new()
 {
@@ -169,24 +174,29 @@ app.MapPost("/servicetickets/{id}/complete", (int id) =>
 
 app.MapGet("/employees", () =>
 {
-    return employees.Select(e => new EmployeeDTO
+    List<Employee> employees = new List<Employee>();
+
+    using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+    connection.Open();
+
+    using NpgsqlCommand command = connection.CreateCommand();
+    command.CommandText = "SELECT * FROM Employee";
+
+    using NpgsqlDataReader reader = command.ExecuteReader();
+
+    while (reader.Read())
     {
-        Id = e.Id,
-        Name = e.Name,
-        Specialty = e.Specialty,
-        ServiceTickets = serviceTickets
-            .Where(st => st.EmployeeId == e.Id)
-            .Select(st => new ServiceTicketDTO
-            {
-                Id = st.Id,
-                CustomerId = st.CustomerId,
-                EmployeeId = st.EmployeeId,
-                Description = st.Description,
-                Emergency = st.Emergency,
-                DateCompleted = st.DateCompleted
-            }).ToList()
-    });
+        employees.Add(new Employee
+        {
+            Id = reader.GetInt32(reader.GetOrdinal("Id")),
+            Name = reader.GetString(reader.GetOrdinal("Name")),
+            Specialty = reader.GetString(reader.GetOrdinal("Specialty"))
+        });
+    }
+
+    return employees;
 });
+
 
 app.MapGet("/employees/{id}", (int id) =>
 {
