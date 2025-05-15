@@ -304,6 +304,16 @@ app.MapPut("/employees/{id}", (int id, Employee employee) =>
     return rowsAffected == 0 ? Results.NotFound() : Results.NoContent();
 });
 
+app.MapDelete("/employees/{id}", (int id) =>
+{
+    using var connection = new NpgsqlConnection(connectionString);
+    connection.Open();
+    using var command = connection.CreateCommand();
+    command.CommandText = "DELETE FROM Employee WHERE Id = @id";
+    command.Parameters.AddWithValue("@id", id);
+    command.ExecuteNonQuery();
+    return Results.NoContent();
+});
 
 // Customers Endpoints
 
