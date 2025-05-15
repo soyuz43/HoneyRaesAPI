@@ -256,6 +256,47 @@ app.MapGet("/employees/{id}", (int id) =>
     return employeeDto == null ? Results.NotFound() : Results.Ok(employeeDto);
 });
 
+app.MapPost("/employees", (Employee employee) =>
+{
+    using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+    connection.Open();
+
+    using NpgsqlCommand command = connection.CreateCommand();
+    command.CommandText = @"
+        INSERT INTO Employee (Name, Specialty)
+        VALUES (@name, @specialty)
+        RETURNING Id;";
+
+    command.Parameters.AddWithValue("@name", employee.Name);
+    command.Parameters.AddWithValue("@specialty", employee.Specialty);
+
+    // get the new ID and return it
+    int newId = (int)command.ExecuteScalar();
+    employee.Id = newId;
+
+    return Results.Created($"/employees/{newId}", employee);
+});
+
+app.MapPut("/employees/{id}", (int id, Employee employee) =>
+{
+    using NpgsqlConnection connection = new NpgsqlConnection(connectionString);
+    connection.Open();
+
+    using NpgsqlCommand command = connection.CreateCommand();
+    command.CommandText = @"
+        UPDATE Employee
+        SET Name = @name,
+            Specialty = @specialty
+        WHERE Id = @id;";
+
+    command.Parameters.AddWithValue("@name", employee.Name);
+    command.Parameters.AddWithValue("@specialty", employee.Specialty);
+    command.Parameters.AddWithValue("@id", id);
+
+    int rowsAffected = command.ExecuteNonQuery();
+    return rowsAffected == 0 ? Results.NotFound() : Results.NoContent();
+});
+
 // Customers Endpoints
 
 app.MapGet("/customers", () =>
