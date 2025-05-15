@@ -96,7 +96,7 @@ app.MapGet("/servicetickets/{id}", (int id) =>
 // Posts
 app.MapPost("/servicetickets", (ServiceTicket serviceTicket) =>
 {
-Customer? customer = customers.FirstOrDefault(c => c.Id == serviceTicket.CustomerId); // Mark the variable as nullable
+    Customer? customer = customers.FirstOrDefault(c => c.Id == serviceTicket.CustomerId); // Mark the variable as nullable
     if (customer == null)
     {
         return Results.BadRequest();
@@ -271,10 +271,17 @@ app.MapPost("/employees", (Employee employee) =>
     command.Parameters.AddWithValue("@specialty", employee.Specialty);
 
     // get the new ID and return it
-    int newId = (int)command.ExecuteScalar();
-    employee.Id = newId;
+    var result = command.ExecuteScalar();
+    if (result is int newId)
+    {
+        employee.Id = newId;
+        return Results.Created($"/employees/{newId}", employee);
+    }
+    else
+    {
+        return Results.Problem("Failed to insert employee.");
+    }
 
-    return Results.Created($"/employees/{newId}", employee);
 });
 
 app.MapPut("/employees/{id}", (int id, Employee employee) =>
@@ -296,6 +303,7 @@ app.MapPut("/employees/{id}", (int id, Employee employee) =>
     int rowsAffected = command.ExecuteNonQuery();
     return rowsAffected == 0 ? Results.NotFound() : Results.NoContent();
 });
+
 
 // Customers Endpoints
 
